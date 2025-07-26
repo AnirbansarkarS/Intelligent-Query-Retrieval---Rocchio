@@ -12,3 +12,18 @@ def main():
 # preventing accidental execution from other file
 if __name__ == "__main__":
 	main()
+	from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def read_root():
+    return {"message": "Hello from FastAPI!"}
+
+
+from fastapi import FastAPI
+from app.api import router
+
+app = FastAPI()
+
+app.include_router(router)
