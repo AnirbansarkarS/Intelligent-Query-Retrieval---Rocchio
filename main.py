@@ -6,7 +6,7 @@
 
 def main():
 	# Main application logic starts here
-	print("test")
+	print("hello world")
 
 # Ensures this script only runs when executed directly,
 # preventing accidental execution from other file
