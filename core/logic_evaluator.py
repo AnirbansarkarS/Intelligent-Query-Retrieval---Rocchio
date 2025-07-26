@@ -13,10 +13,10 @@ def save_to_json(result, filename="output.json"):
     with open(filename, "w") as f:
         json.dump(result, f, indent=4)
 
-# Example usage
-if __name__ == "__main__":
-    # Sample input, later this will come from other modules
-    sample_text = "This is a sample document used for testing the logic evaluator's capability."
-    result = evaluate_text(sample_text)
-    save_to_json(result)
-    print("Evaluation complete. Output saved to output.json.")
+# # Example usage
+# if __name__ == "__main__":
+#     # Sample input, later this will come from other modules
+#     sample_text = "This is a sample document used for testing the logic evaluator's capability."
+#     result = evaluate_text(sample_text)
+#     save_to_json(result)
+#     print("Evaluation complete. Output saved to output.json.")
