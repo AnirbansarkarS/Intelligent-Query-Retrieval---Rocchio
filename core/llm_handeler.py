@@ -4,7 +4,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 
 load_dotenv()
-genai.configure(api_key=os.getenv("AIzaSyCCX7MB74nC0n0Sc-XspmmAz26jFyFyH4A"))
+genai.configure(api_key=os.getenv("GEMINI"))
 
 model = genai.GenerativeModel("gemini-pro")  
 
@@ -20,3 +20,4 @@ def query_gemini_flash(question: str, context: str) -> str:
         return response.text.strip()
     except Exception as e:
         return f"Error: {str(e)}"
+        #
