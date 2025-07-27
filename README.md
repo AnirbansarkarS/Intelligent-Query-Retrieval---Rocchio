@@ -48,10 +48,9 @@ Designed to work in domains such as:
 | Component | Tech |
 |----------|------|
 | Backend API | [FastAPI](https://fastapi.tiangolo.com/) |
-| LLM Orchestration | [LangChain](https://www.langchain.com/) (Optional) |
-| Embeddings | FAISS / Pinecone |
-| File Parsers | PyMuPDF, python-docx, email.parser |
-| LLM Provider | OpenAI / HuggingFace (pluggable) |
+| Embeddings | Pinecone |
+| File Parsers | pdfplumber, python-docx, email.parser |
+| LLM Provider | Gemini - 2.5 |
 
 ---
 
