@@ -9,4 +9,3 @@ def read_root():
 
 app.include_router(router)
 
-#test
