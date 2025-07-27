@@ -49,7 +49,7 @@ Designed to work in domains such as:
 |----------|------|
 | Backend API | [FastAPI](https://fastapi.tiangolo.com/) |
 | Embeddings | Pinecone |
-| File Parsers | PyMuPDF, python-docx, email.parser |
+| File Parsers | pdfplumber, python-docx, email.parser |
 | LLM Provider | Gemini - 2.5 |
 
 ---
