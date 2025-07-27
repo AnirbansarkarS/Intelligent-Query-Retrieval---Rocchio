@@ -1,4 +1,5 @@
 __pycache__
 venv
 .venv
-tempCodeRunnerFile.python
+tempCodeRunnerFile.python\
+.env
