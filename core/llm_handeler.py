@@ -20,3 +20,4 @@ def query_gemini_flash(question: str, context: str) -> str:
         return response.text.strip()
     except Exception as e:
         return f"Error: {str(e)}"
+        

@@ -14,7 +14,7 @@ from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from app.core.parser import parse_document
 from app.utils.chunker import chunk_text
-from app.core.llm_handler import query_openai
+from app.core.llm_handler import query_gemini_flash
 
 app = FastAPI()
 
