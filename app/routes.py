@@ -1,13 +1,30 @@
-from fastapi import APIRouter
-from app.schemas import QueryRequest, QueryResponse
+
+# ANIRBAN
+from fastapi import APIRouter, HTTPException
+from app.schemas import QueryRequest, QueryResponse  
+from app.core.parser import parse_document
+from app.utils.chunker import chunk_text
+from app.core.llm_handler import query_gemini_flash
 
 router = APIRouter()
 
 @router.post("/hackrx/run", response_model=QueryResponse)
-def run_pipeline(request: QueryRequest):
-    # Placeholder logic for now
-    return QueryResponse(
-        success=True,
-        message="Pipeline ran successfully",
-        data={"matched_clauses": [], "final_decision": "Pending"}
-    )
+async def run_hackrx(req: QueryRequest):
+    try:
+        text = parse_document(req.documents)
+        chunks = chunk_text(text)
+        results = []
+
+        for q in req.questions:
+            answers = [query_gemini_flash(q, c) for c in chunks]
+            filtered = [a for a in answers if 'Not Found' not in a]
+            final_answer = filtered[0] if filtered else 'Not Found'
+            results.append(final_answer)
+
+        return QueryResponse(
+            success=True,
+            message="Pipeline ran successfully",
+            data={"answers": results}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
