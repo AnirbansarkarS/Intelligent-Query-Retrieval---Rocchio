@@ -8,4 +8,3 @@ def read_root():
 	return {"message": "Hello from FastAPI!"}
 
 app.include_router(router)
-
