@@ -1,9 +1,12 @@
 from pydantic import BaseModel
+from typing import List,Dict,Any
 
-class RunRequest(BaseModel):
-	document_text: str
-	query: str
 
-class RunResponse(BaseModel):
-	status: str
-	output: str
+class QueryRequest(BaseModel):
+    documents: str
+    questions: List[str]
+
+class QueryResponse(BaseModel):
+    success: bool
+    message: str
+    data: Dict[str, Any] 
