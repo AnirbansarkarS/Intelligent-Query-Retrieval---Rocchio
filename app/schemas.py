@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import List
 
 class RunRequest(BaseModel):
 	document_text: str
@@ -7,3 +8,5 @@ class RunRequest(BaseModel):
 class RunResponse(BaseModel):
 	status: str
 	output: str
+
+
