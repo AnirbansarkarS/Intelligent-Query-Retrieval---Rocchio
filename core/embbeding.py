@@ -11,7 +11,7 @@ load_dotenv()
 
 # Configure Gemini
 genai.configure(api_key=os.getenv("GEMINI_KEY"))
-model = genai.GenerativeModel("gemini-pro")
+model = genai.GenerativeModel("gemini-embedding-001")
 
 # Configure Pinecone
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
