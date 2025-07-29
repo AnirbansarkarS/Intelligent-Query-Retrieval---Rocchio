@@ -1,22 +1,18 @@
-import json
+def evaluate_logic(matches):
+    """
+    Evaluates the top matching clauses based on the score,
+    and returns a structured JSON with simplified answers.
+    """
+    # Sort matches by score ascending (lower is better)
+    sorted_matches = sorted(matches, key=lambda x: x['score'])
 
-def evaluate_text(text):
-    # Dummy logic: Count words and characters
-    result = {
-        "word_count": len(text.split()),
-        "character_count": len(text),
-        "summary": text[:100] + "..." if len(text) > 100 else text
-    }
-    return result
+    # Take top 2–3 matches
+    top_matches = sorted_matches[:3]
 
-def save_to_json(result, filename="output.json"):
-    with open(filename, "w") as f:
-        json.dump(result, f, indent=4)
+    # Extract only the clause_text from each
+    answers = [match['clause_text'] for match in top_matches]
 
-# # Example usage
-# if __name__ == "__main__":
-#     # Sample input, later this will come from other modules
-#     sample_text = "This is a sample document used for testing the logic evaluator's capability."
-#     result = evaluate_text(sample_text)
-#     save_to_json(result)
-#     print("Evaluation complete. Output saved to output.json.")
+    # Return in required format
+    return{
+        "answers":answers
+}
