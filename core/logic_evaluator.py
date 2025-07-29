@@ -16,3 +16,6 @@ def evaluate_logic(matches):
     return{
         "answers":answers
 }
+
+
+# TODO make json type structure output
