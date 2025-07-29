@@ -13,8 +13,8 @@ app.include_router(router)
 #soumbha
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from auth import verify_token
-from schemas import RunRequest
+from app.auth import verify_token
+from app.schemas import QueryRequest
 
 app = FastAPI()
 
@@ -27,7 +27,7 @@ app.add_middleware(
 )
 
 @app.post("/api/v1/hackrx/run")
-def run_submission(request: RunRequest, _: bool = Depends(verify_token)):
+def run_submission(request: QueryRequest, _: bool = Depends(verify_token)):
     pdf_url = request.documents
     questions = request.questions
 

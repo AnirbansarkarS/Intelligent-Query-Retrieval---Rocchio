@@ -2,9 +2,9 @@
 # ANIRBAN
 from fastapi import APIRouter, HTTPException
 from app.schemas import QueryRequest, QueryResponse  
-from app.core.parser import parse_document
-from app.utils.chunker import chunk_text
-from app.core.llm_handler import query_gemini_flash
+from core.parser import parse_document
+from utils.chunker import chunk_text
+from core.llm_handeler import query_gemini_flash
 
 router = APIRouter()
 

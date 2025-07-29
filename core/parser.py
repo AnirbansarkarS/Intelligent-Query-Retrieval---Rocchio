@@ -16,6 +16,8 @@ def parse_document(url: str) -> str:
         return parse_docx(url)
     else:
         raise ValueError("Unsupported file format")
+    
+    # TODO add email .eml
 
 def parse_pdf(url: str) -> str:
     file_bytes = download_file(url)
@@ -30,3 +32,6 @@ def parse_docx(url: str) -> str:
     file_bytes = download_file(url)
     doc = Document(io.BytesIO(file_bytes))
     return "\n".join([para.text for para in doc.paragraphs if para.text.strip()]).strip()
+
+
+# NOTE: XPO WILL REDO IT! dont touch
