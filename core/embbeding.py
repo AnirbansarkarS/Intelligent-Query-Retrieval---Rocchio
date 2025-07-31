@@ -86,7 +86,7 @@ def ingest_document(doc_id: str, text: str, metadata: dict = None):
 # ==============================
 # RETRIEVAL (Top Chunks)
 # ==============================
-def semantic_search(query: str, doc_id: str, top_k: int = 10):
+def semantic_search(query: str, doc_id: str, top_k: int = 12):
     embedding = get_gemini_embedding(query, "retrieval_query")
     results = index.query(vector=embedding, top_k=top_k, include_metadata=True, namespace=doc_id)
 
