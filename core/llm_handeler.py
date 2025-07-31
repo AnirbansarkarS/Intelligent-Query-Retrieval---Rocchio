@@ -10,21 +10,20 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 
 SYSTEM_INSTRUCTION = """
 You are an expert assistant for insurance/legal policies.
-Based on the context, answer the question clearly and explain why.
-If the answer is not found, set "answer" to null and keep the explanation and sources relevant.
+Based on the context and your knowledge, answer the question clearly and explain why.
+If the context has the answer, cite it. If not, answer null.
 
 Respond ONLY with valid JSON in this exact format:
 {
-    "answer": "...",  // or null if not found
+    "answer": "...",
     "explanation": "...",
     "sources": ["..."]
 }
 
 Rules:
 - Always include all three keys.
-- If answer is not found, "answer": null (not a string).
 - Do not include any markdown, code fences, or extra text outside the JSON.
-- "sources" can be an empty array if no sources are available.
+- If context provided useful info, include the IDs in "sources", else keep it empty.
 """
 
 # edited qury to better suite the api requiremnet

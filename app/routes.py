@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from app.schemas import QueryRequest, QueryResponse  
 from core.parser import parse_document
-from utils.chunker import chunk_text
+from utils.chunker import tokenize_and_chunk
 from core.llm_handeler import query_gemini_flash
 
 router = APIRouter()
@@ -12,7 +12,7 @@ router = APIRouter()
 async def run_hackrx(req: QueryRequest):
     try:
         text = parse_document(req.documents)
-        chunks = chunk_text(text)
+        chunks = tokenize_and_chunk(text)
         results = []
 
         for q in req.questions:
