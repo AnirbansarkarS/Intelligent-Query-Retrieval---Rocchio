@@ -1,14 +1,15 @@
 # XPOLION : Intelligent Query & Retrieval (Optimized Chunk-Based)
-# Features: Chunked Ingestion, Semantic Search, LLM Answer Generation
+# Features: Chunked Ingestion, Batch Query Expansion, Multi-Query Semantic Search, LLM Answer Generation
 
 import os
 import time
 import logging
+import json
 from dotenv import load_dotenv
 from pinecone import Pinecone, ServerlessSpec
 import google.generativeai as genai
 
-from core.llm_handeler import query_gemini_flash
+from core.llm_handeler import query_gemini_flash  # For final structured answer
 from utils.chunker import tokenize_and_chunk
 
 # ==============================
@@ -41,6 +42,55 @@ if INDEX_NAME not in [idx["name"] for idx in pc.list_indexes()]:
 
 index = pc.Index(INDEX_NAME)
 logging.info(f"Connected to Pinecone index: {INDEX_NAME}")
+
+# ==============================
+# BATCH QUERY EXPANSION WITH GEMINI FLASH-LITE
+# ==============================
+def batch_expand_queries(questions: list, num_variants: int = 5) -> dict:
+    """
+    Expand multiple questions in a single Gemini Flash-Lite call with strict JSON rules.
+    Returns: dict like {"1": ["alt1", "alt2", ...], "2": [...], ...}
+    """
+    prompt = (
+        f"You are a query rewriter. Generate {num_variants} alternative phrasings for each question.\n\n"
+        f"STRICT RULES:\n"
+        f"1. Respond ONLY with valid JSON. No text before or after.\n"
+        f"2. Do NOT include markdown, code fences, comments, or explanations.\n"
+        f"3. Each key must be a string of the question number (e.g., \"1\", \"2\").\n"
+        f"4. Each value must be an array of {num_variants} strings (the alternative phrasings).\n"
+        f"5. Use plain text only in values. No quotes inside the text.\n"
+        f"6. Do NOT include the original question in the alternatives.\n\n"
+        f"Example:\n"
+        f'{{"1": ["alt1", "alt2", "alt3"], "2": ["alt1", "alt2", "alt3"]}}\n\n'
+        f"Questions:\n"
+    )
+    for i, q in enumerate(questions, start=1):
+        prompt += f"{i}. {q}\n"
+
+    try:
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+        response = model.generate_content(
+            prompt,
+            generation_config={"temperature": 0.3,}
+        )
+        raw_text = response.text.strip()
+
+        # ✅ Auto-clean: Strip any code fences if still present
+        if raw_text.startswith("```"):
+            raw_text = raw_text.strip("`").replace("json", "").strip()
+
+        # ✅ Validate and load JSON safely
+        return json.loads(raw_text)
+    except json.JSONDecodeError as e:
+        logging.error(f"[ERROR] JSON decode failed: {e}\nRaw output:\n{raw_text}")
+        # ✅ Fallback: return empty lists for all questions
+        return {str(i): [] for i in range(len(questions))}
+    except Exception as e:
+        logging.error(f"[ERROR] Batch expansion failed: {e}")
+        return {str(i): [] for i in range(len(questions))}
+
+
+
 
 # ==============================
 # EMBEDDING HELPER
@@ -84,17 +134,59 @@ def ingest_document(doc_id: str, text: str, metadata: dict = None):
     logging.info(f"Ingested {len(chunks)} chunks for '{doc_id}'.")
 
 # ==============================
-# RETRIEVAL (Top Chunks)
+# MULTI-QUERY SEMANTIC SEARCH
 # ==============================
-def semantic_search(query: str, doc_id: str, top_k: int = 12):
-    embedding = get_gemini_embedding(query, "retrieval_query")
-    results = index.query(vector=embedding, top_k=top_k, include_metadata=True, namespace=doc_id)
+def semantic_search_multi(variants: list, doc_id: str, top_k: int = 10, original_query: str = None):
+    """
+    Perform weighted, normalized aggregation of multi-query search results.
+    Boosts original query matches and normalizes per query.
+    """
+    all_matches = {}
+    weights = {
+        "original": 1.5,  # Boost for the main query
+        "variant": 1.0    # Normal weight for paraphrases
+    }
 
-    matches = [
-        {"id": m["id"], "score": round(m["score"], 4), "text": m["metadata"]["text"]}
-        for m in results["matches"]
-    ]
-    return matches
+    for variant in variants:
+        embedding = get_gemini_embedding(variant, "retrieval_query")
+        results = index.query(
+            vector=embedding,
+            top_k=top_k,
+            include_metadata=True,
+            namespace=doc_id
+        )
+
+        matches = results.get("matches", [])
+        if not matches:
+            continue
+
+        # Normalize scores for this query
+        max_score = max(m["score"] for m in matches)
+        if max_score == 0:
+            max_score = 1  # Avoid divide-by-zero
+
+        for match in matches:
+            chunk_id = match["id"]
+            norm_score = match["score"] / max_score
+
+            # Apply weight
+            if original_query and variant.strip() == original_query.strip():
+                weighted_score = norm_score * weights["original"]
+            else:
+                weighted_score = norm_score * weights["variant"]
+
+            if chunk_id in all_matches:
+                all_matches[chunk_id]["score"] += weighted_score
+            else:
+                all_matches[chunk_id] = {
+                    "id": chunk_id,
+                    "score": weighted_score,
+                    "text": match["metadata"]["text"]
+                }
+
+    # Sort by aggregated weighted score
+    sorted_matches = sorted(all_matches.values(), key=lambda x: x["score"], reverse=True)
+    return sorted_matches[:top_k]
 
 # ==============================
 # ANSWER GENERATION
@@ -108,9 +200,15 @@ def answer_question(query: str, matches: list) -> str:
 # ==============================
 def run_pipeline(doc_id: str, text: str, questions: list, meta: dict = None):
     ingest_document(doc_id, text, meta)
+
+    # Batch expand all questions in one go
+    expansions = batch_expand_queries(questions)
+
     results = []
-    for q in questions:
-        matches = semantic_search(q, doc_id)
+    for idx, q in enumerate(questions, start=1):
+        variants = [q] + expansions.get(str(idx), [])
+        logging.info(f"Question: {q} | Variants: {len(variants)}")
+        matches = semantic_search_multi(variants, doc_id)
         answer = answer_question(q, matches)
         results.append({"question": q, "answer": answer})
     return results
