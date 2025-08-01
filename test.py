@@ -3,14 +3,18 @@
 # ==============================
 
 import json
+import logging
 from core.parser import parse_document
-from core.embbeding import run_pipeline  # <-- new optimized version
+from core.embbeding import run_pipeline  # Updated optimized pipeline
 
 # ------------------------------
 # Document Source
 # ------------------------------
 doc_url = "https://hackrx.blob.core.windows.net/assets/policy.pdf?sv=2023-01-03&st=2025-07-04T09%3A11%3A24Z&se=2027-07-05T09%3A11%3A00Z&sr=b&sp=r&sig=N4a9OU0w0QXO6AOIBiu4bpl7AXvEZogeT%2FjUHNO7HzQ%3D"
-context = parse_document(doc_url)  # Must return text string
+logging.info(f"[INFO] Parsing document from URL: {doc_url}")
+context = parse_document(doc_url)  # Must return plain text string
+if not context:
+    raise ValueError("Document parsing failed: context is empty.")
 
 # ------------------------------
 # Questions
@@ -28,14 +32,15 @@ questions = [
     "Are there any sub-limits on room rent and ICU charges for Plan A?"
 ]
 
-results = []
-print("\n[INFO] Running Q&A tests with optimized pipeline...\n")
-
 # ------------------------------
 # Main Execution
 # ------------------------------
+print("\n[INFO] Running Q&A tests with optimized XPOLION pipeline...\n")
+
+results = []
+
 try:
-    # Run full pipeline for all questions
+    # Run the optimized retrieval + answer pipeline
     pipeline_results = run_pipeline(
         doc_id="policy_doc",
         text=context,
@@ -54,13 +59,13 @@ try:
         }
         results.append(qa_entry)
 
-        # Print for quick verification
+        # Print each Q&A for verification
         print(f"Q{i}: {question}")
         print(f"A{i}: {answer}")
         print("-" * 80)
 
 except Exception as e:
-    print(f"[ERROR] Testing failed: {e}")
+    logging.error(f"[ERROR] Q&A Testing failed: {e}")
 
 # ------------------------------
 # Save Results

@@ -1,6 +1,6 @@
 import tiktoken
 
-def tokenize_and_chunk(text: str, max_tokens: int = 500, overlap: int = 50):
+def tokenize_and_chunk(text: str, max_tokens: int = 400, overlap: int = 80):
     enc = tiktoken.get_encoding("cl100k_base")  # GPT tokenizer (approx Gemini)
     tokens = enc.encode(text)
 
