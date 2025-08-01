@@ -1,9 +1,15 @@
-def chunk_text(text: str, max_words: int = 200, overlap: int = 30):
-    words = text.split()
+import tiktoken
+
+def tokenize_and_chunk(text: str, max_tokens: int = 500, overlap: int = 50):
+    enc = tiktoken.get_encoding("cl100k_base")  # GPT tokenizer (approx Gemini)
+    tokens = enc.encode(text)
+
     chunks = []
-    i = 0
-    while i < len(words):
-        chunk = " ".join(words[i:i + max_words])
-        chunks.append(chunk)
-        i += max_words - overlap
+    start = 0
+    while start < len(tokens):
+        end = min(start + max_tokens, len(tokens))
+        chunk_tokens = tokens[start:end]
+        chunk_text = enc.decode(chunk_tokens)
+        chunks.append(chunk_text)
+        start += max_tokens - overlap  # overlap for context
     return chunks
