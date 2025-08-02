@@ -1,12 +1,13 @@
 # ==============================
 # Q&A TESTING FOR OPTIMIZED PIPELINE
 # ==============================
-
+import time
 import json
 import logging
 from core.parser import parse_document
 from core.embbeding import run_pipeline  # Updated optimized pipeline
 
+start = time.perf_counter()
 # ------------------------------
 # Document Source
 # ------------------------------
@@ -48,30 +49,14 @@ try:
         meta={"source": "policy.pdf"}
     )
 
-    # Collect answers with details
-    for i, res in enumerate(pipeline_results, 1):
-        question = res.get("question", "")
-        answer = res.get("answer", "").strip()
-
-        qa_entry = {
-            "question": question,
-            "answer": answer
-        }
-        results.append(qa_entry)
-
-        # Print each Q&A for verification
-        print(f"Q{i}: {question}")
-        print(f"A{i}: {answer}")
-        print("-" * 80)
+    print(pipeline_results)
 
 except Exception as e:
     logging.error(f"[ERROR] Q&A Testing failed: {e}")
 
-# ------------------------------
-# Save Results
-# ------------------------------
-output_file = "qa_results_optimized.json"
-with open(output_file, "w", encoding="utf-8") as f:
-    json.dump(results, f, indent=4)
 
-print(f"\n[INFO] Results saved to {output_file}")
+
+end =  time.perf_counter()
+execution_time = end - start
+
+logging.info(f"Execution time: {execution_time:.2f} seconds")
