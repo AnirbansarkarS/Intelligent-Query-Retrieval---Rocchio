@@ -1,3 +1,52 @@
+
+# # ==============================
+# # BATCH QUERY EXPANSION WITH GEMINI FLASH-LITE
+# # ==============================
+# def batch_expand_queries(questions: list, num_variants: int = 4 ) -> dict:
+#     """
+#     Expand multiple questions in a single Gemini Flash-Lite call with strict JSON rules.
+#     Returns: dict like {"1": ["alt1", "alt2", ...], "2": [...], ...}
+#     """
+#     prompt = (
+#         f"You are a query rewriter. Generate {num_variants} alternative phrasings for each question.\n\n"
+#         f"STRICT RULES:\n"
+#         f"1. Respond ONLY with valid JSON. No text before or after.\n"
+#         f"2. Do NOT include markdown, code fences, comments, or explanations.\n"
+#         f"3. Each key must be a string of the question number (e.g., \"1\", \"2\").\n"
+#         f"4. Each value must be an array of {num_variants} strings (the alternative phrasings).\n"
+#         f"5. Use plain text only in values. No quotes inside the text.\n"
+#         f"6. Do NOT include the original question in the alternatives.\n\n"
+#         f"Example:\n"
+#         f'{{"1": ["alt1", "alt2", "alt3"], "2": ["alt1", "alt2", "alt3"]}}\n\n'
+#         f"Questions:\n"
+#     )
+#     for i, q in enumerate(questions, start=1):
+#         prompt += f"{i}. {q}\n"
+
+#     try:
+#         model = genai.GenerativeModel("gemini-2.5-flash-lite")
+#         response = model.generate_content(
+#             prompt,
+#             generation_config={"temperature": 0.3,}
+#         )
+#         raw_text = response.text.strip()
+
+#         # ✅ Auto-clean: Strip any code fences if still present
+#         if raw_text.startswith("```"):
+#             raw_text = raw_text.strip("`").replace("json", "").strip()
+
+#         # ✅ Validate and load JSON safely
+#         return json.loads(raw_text)
+#     except json.JSONDecodeError as e:
+#         logging.error(f"[ERROR] JSON decode failed: {e}\nRaw output:\n{raw_text}")
+#         # ✅ Fallback: return empty lists for all questions
+#         return {str(i): [] for i in range(len(questions))}
+#     except Exception as e:
+#         logging.error(f"[ERROR] Batch expansion failed: {e}")
+#         return {str(i): [] for i in range(len(questions))}
+
+
+
 # XPOLION : Intelligent Query & Retrieval (Optimized Chunk-Based)
 # Features: Chunked Ingestion, Batch Query Expansion, Multi-Query Semantic Search, LLM Answer Generation
 
@@ -8,6 +57,8 @@ import logging
 from dotenv import load_dotenv
 from pinecone import Pinecone, ServerlessSpec
 import google.generativeai as genai
+import google.genai as genai_batch
+from google.genai import types
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -21,9 +72,11 @@ from utils.chunker import tokenize_and_chunk
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
-genai.configure(api_key=os.getenv("GEMINI_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 EMBED_MODEL = "models/embedding-001"
-EMBED_DIM = 768
+EMBED_DIM = 1536
+
+client = genai_batch.Client()
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 INDEX_NAME = os.getenv("PINECONE_INDEX", "doc-embeddings")
@@ -50,18 +103,27 @@ logging.info(f"Connected to Pinecone index: {INDEX_NAME}")
 # ==============================
 # EMBEDDING HELPER
 # ==============================
-def get_gemini_embedding(text: str, task_type: str) -> list:
+
+def get_gemini_embedding(tasks: list, task_type: str) -> list:
     for attempt in range(3):
         try:
-            response = genai.embed_content(model=EMBED_MODEL, content=text, task_type=task_type)
-            embedding = response.get("embedding")
-            if not embedding:
-                raise ValueError("Empty embedding returned from Gemini.")
-            return embedding
+            response = client.models.embed_content(
+                model="gemini-embedding-001",
+                contents=tasks,
+                config=types.EmbedContentConfig(task_type=task_type,output_dimensionality=EMBED_DIM)
+            )
+            embeddings = [e.values for e in response.embeddings]
+
+            if not embeddings or any(e is None for e in embeddings):
+                raise ValueError("Empty embedding(s) returned from Gemini.")
+            
+            return embeddings
+        
         except Exception as e:
-            logging.warning(f"Embedding attempt {attempt+1} failed: {e}")
+            logging.warning(f"Embedding attempt {attempt + 1} failed: {e}")
             time.sleep(1)
-    raise RuntimeError(f"Failed to fetch embedding after 3 retries for text: {text[:50]}...")
+
+    raise RuntimeError(f"Failed to fetch embedding after 3 retries for text: {tasks[0][:50]}...")
 
 # ==============================
 # INGESTION (Chunked)
@@ -96,25 +158,24 @@ def ingest_document(doc_id: str, text: str, metadata: dict = None):
     chunks = tokenize_and_chunk(text)
     logging.info(f"Tokenized into {len(chunks)} chunks.")
 
-    vectors = []
+    try:
+        embeddings = get_gemini_embedding(chunks, "RETRIEVAL_DOCUMENT")
+    except Exception as e:
+        logging.error(f"Failed to embed document '{doc_id}': {e}")
+        return
 
-    def embed_chunk(i, chunk):
-        emb = get_gemini_embedding(chunk, "retrieval_document")
-        return {
+    vectors = []
+    for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+        vectors.append({
             "id": f"{doc_id}_{i}",
             "values": emb,
             "metadata": {**(metadata or {}), "text": chunk, "chunk_index": i}
-        }
-
-    # Parallel embedding
-    with ThreadPoolExecutor(max_workers=min(16, len(chunks))) as executor:
-        futures = [executor.submit(embed_chunk, i, chunk) for i, chunk in enumerate(chunks)]
-        for future in as_completed(futures):
-            vectors.append(future.result())
+        })
 
     index.upsert(vectors=vectors, namespace=ns)
     logging.info(f"Ingested {len(vectors)} chunks for '{doc_id}'.")
-    wait_for_pinecone_commit(ns,len(vectors),10,0.5)
+    wait_for_pinecone_commit(ns, len(vectors), 10, 2)
+
 
 # ==============================
 # MULTI-QUERY SEMANTIC SEARCH
@@ -133,7 +194,7 @@ def semantic_search_multi(variants: list, doc_id: str, top_k: int = 5, original_
     for variant in variants:
         embedding = get_gemini_embedding(variant, "retrieval_query")
         results = index.query(
-            vector=embedding,
+            vector=embedding[0],
             top_k=top_k,
             include_metadata=True,
             namespace=doc_id
@@ -204,3 +265,7 @@ def run_pipeline(doc_id: str, text: str, questions: list, meta: dict = None):
             results.append(future.result())
 
     return results
+
+
+
+

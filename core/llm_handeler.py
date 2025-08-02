@@ -15,7 +15,7 @@ If the context has the answer, cite it. If not, answer null.
 
 Respond ONLY with valid JSON in this exact format:
 {
-    "answer": "...",
+    "answer": "...", // keep the answer summarized to the point
     "explanation": "...",
     "sources": ["..."]
 }

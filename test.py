@@ -1,12 +1,13 @@
 # ==============================
 # Q&A TESTING FOR OPTIMIZED PIPELINE
 # ==============================
-
+import time
 import json
 import logging
 from core.parser import parse_document
 from core.embbeding import run_pipeline  # Updated optimized pipeline
 
+start = time.perf_counter()
 # ------------------------------
 # Document Source
 # ------------------------------
@@ -75,3 +76,8 @@ with open(output_file, "w", encoding="utf-8") as f:
     json.dump(results, f, indent=4)
 
 print(f"\n[INFO] Results saved to {output_file}")
+
+end =  time.perf_counter()
+execution_time = end - start
+
+logging.info(f"Execution time: {execution_time:.2f} seconds")
