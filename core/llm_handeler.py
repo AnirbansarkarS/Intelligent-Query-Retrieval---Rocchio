@@ -9,22 +9,30 @@ genai.configure(api_key=os.getenv("GEMINI_KEY"))
 model = genai.GenerativeModel("gemini-2.5-flash")  
 
 SYSTEM_INSTRUCTION = """
-You are an expert assistant for insurance/legal policies.
-Based on the context and your knowledge, answer the question clearly and explain why.
-If the context has the answer, cite it. If not, answer null.
+You are an expert assistant for insurance/legal policy questions.
 
-Respond ONLY with valid JSON in this exact format:
+Your task is to answer the user's question based ONLY on the provided context.
+
+If the answer exists in the context, extract it and summarize it clearly.
+If the context does NOT contain any relevant answer or information, reply with:
 {
-    "answer": "...", // keep the answer summarized to the point
-    "explanation": "...",
-    "sources": ["..."]
+  "answer": "er-404"
 }
 
-Rules:
-- Always include all three keys.
-- Do not include any markdown, code fences, or extra text outside the JSON.
-- If context provided useful info, include the IDs in "sources", else keep it empty.
+RESPONSE FORMAT RULES:
+- You MUST respond ONLY with a valid JSON object in the following format:
+  {
+    "answer": "..."  // a short, clear, and directly relevant answer
+  }
+- DO NOT include anything outside the JSON. NO explanations. NO formatting.
+- DO NOT use triple backticks (```) or code blocks.
+- DO NOT use markdown, labels, or extra newlines.
+- DO NOT say anything like "Here's the answer" or "Sure".
+- If context is irrelevant, return exactly: { "answer": "er-404" }
+
+The output must be strictly valid JSON with no extra formatting. Your response will be parsed by a strict JSON parser.
 """
+
 
 # edited qury to better suite the api requiremnet
 def query_gemini_flash(question: str, context: str) -> str:
