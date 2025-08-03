@@ -27,7 +27,7 @@ Designed to work in domains such as:
 ## 🔧 Features
 
 - 📄 Multi-format document ingestion (PDF, DOCX, Email)
-- 🔍 Semantic clause search via vector embeddings (FAISS/Pinecone)
+- 🔍 Semantic clause search via vector embeddings (Pinecone)
 - 🤖 Query parsing + clause matching with LLM assistance
 - 📊 Explainable rationale with clause references
 - 🧾 JSON structured outputs
@@ -66,8 +66,12 @@ cd Document-extractor
 ```bash
 pip install -r requirements.txt
 ```
+### 3. SET UP API KEYS IN .env
+```
+Adding later
+```
 
-### 3. Run the server
+### 4. Run the server
 ```bash
 python main.py
 ```
@@ -82,8 +86,6 @@ python main.py
 ```json
 {
   "answer": "The agreement may be terminated with 30 days prior notice by either party.",
-  "clause_reference": "Section 9.2 - Termination",
-  "rationale": "This clause explicitly states the termination conditions and required notice period."
 }
 ```
 
