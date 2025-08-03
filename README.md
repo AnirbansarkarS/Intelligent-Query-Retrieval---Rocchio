@@ -74,7 +74,7 @@ PINECONE_API_KEY = <your pincone key>
 
 ### 4. Run the server
 ```bash
-python main.py
+uvicorn main:app --host 0.0.0.0 --port <$PORT>
 ```
 
 ---
