@@ -102,7 +102,7 @@ Document-extractor
 ├── .gitignore                # Specifies files and directories to ignore in Git
 ├── README.md                 # Project description, usage instructions, and documentation
 └── LICENCE                   # Licensing information for the project
-
+```
 ---
 
 ## 📌 Sample Query & Output
