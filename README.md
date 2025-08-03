@@ -46,7 +46,6 @@ Designed to work in domains such as:
 ---
 
 ## ⚙️ Tech Stack
-   !todo!
 | Component | Tech |
 |----------|------|
 | Backend API | [FastAPI](https://fastapi.tiangolo.com/) |
@@ -78,6 +77,29 @@ PINECONE_API_KEY = <your pincone key>
 ```bash
 uvicorn main:app --host 0.0.0.0 --port <$PORT>
 ```
+
+---
+
+Document-extractor
+├── app
+│   ├── api.py                # Defines API endpoints and initializes FastAPI app
+│   ├── auth.py               # Handles authentication and authorization logic
+│   ├── routes.py             # Registers routes and maps endpoints to controller functions
+│   └── schemas.py            # Defines Pydantic models for request and response validation
+├── core
+│   ├── embbeding.py          # Generates and manages embeddings for semantic search
+│   ├── llm_handeler.py       # Handles interaction with the LLM for query answering
+│   ├── logic_evaluator.py    # Evaluates logical expressions or conditions in queries
+│   └── parser.py             # Parses documents and extracts structured data
+├── utils
+│   ├── chunker.py            # Splits documents into chunks for processing and indexing
+│   └── transform_answers.py  # Formats and post-processes answers from the LLM
+├── requirements.txt        # Lists Python dependencies for the project
+├── test.py                 # Contains test cases for core functionalities
+├── main.py                 # Entry point to start the FastAPI server
+├── .gitignore              # Specifies files and directories to ignore in Git
+├── README.md               # Project description, usage instructions, and documentation
+└── LICENCE                 # Licensing information for the project
 
 ---
 
