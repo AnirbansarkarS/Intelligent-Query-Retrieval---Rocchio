@@ -2,9 +2,11 @@
 
 > A smart, context-aware document query engine powered by LLMs, built for real-world use cases in insurance, legal, HR, and compliance.
 
-![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-API-green)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg?style=flat-square)
+![FastAPI](https://img.shields.io/badge/FastAPI-API-green?style=flat-square)
+![Gemini](https://img.shields.io/badge/LLM-Gemini-blueviolet?style=flat-square)
+![Pinecone](https://img.shields.io/badge/VectorDB-Pinecone-teal?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
 ---
 
