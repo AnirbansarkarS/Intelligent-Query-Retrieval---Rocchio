@@ -79,7 +79,7 @@ uvicorn main:app --host 0.0.0.0 --port <$PORT>
 ```
 
 ---
-# File Structure
+## 📁 File Structure
 
 ```plaintext
 Document-extractor
