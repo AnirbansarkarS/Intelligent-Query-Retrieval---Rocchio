@@ -1,4 +1,4 @@
-# XPOLION: Intelligent Query & Retrieval (Optimized Chunk-Based)
+#Intelligent Query & Retrieval (Optimized Chunk-Based) by XpolioN
 # Features: Chunked Ingestion, Batch Query Expansion, Multi-Query Semantic Search, LLM Answer Generation
 
 import os
