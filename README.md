@@ -120,6 +120,8 @@ Document-extractor
 
 ## 👨‍💻 Authors
 
+### Team Byte Builders
+
 - **[Anirban Sarkar](https://github.com/AnirbansarkarS)**
 - **[Darsan Ghosh](https://github.com/XpolioN2005)**
 - **[Avik Haldar](https://github.com/avikhaldar833-a11y)**
