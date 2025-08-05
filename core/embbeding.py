@@ -60,6 +60,13 @@ def get_gemini_embedding(text: str, task_type: str) -> list:
 # ====================
 # INGESTION
 # ====================
+def file_exists(doc_id: str) -> bool:
+    ns = doc_id
+    if ns in index.describe_index_stats().get("namespaces", {}):
+        logging.info(f"Document '{doc_id}' already ingested. Skipping.")
+        return True
+    return False
+
 def wait_for_pinecone_commit(namespace: str, expected_count: int, timeout=30, interval=2):
     start = time.time()
     while time.time() - start < timeout:
@@ -76,8 +83,7 @@ def wait_for_pinecone_commit(namespace: str, expected_count: int, timeout=30, in
 
 def ingest_document(doc_id: str, text: str, metadata: dict = None):
     ns = doc_id
-    if ns in index.describe_index_stats().get("namespaces", {}):
-        logging.info(f"Document '{doc_id}' already ingested. Skipping.")
+    if file_exists(ns):
         return
 
     chunks = tokenize_and_chunk(text)

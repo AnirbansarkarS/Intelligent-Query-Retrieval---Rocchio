@@ -6,21 +6,37 @@ from email import policy
 from email.parser import BytesParser
 from email.message import EmailMessage
 
-def download_file(url: str) -> tuple[bytes, str]:
+import requests
+import re
+
+def download_file(url: str) -> tuple[bytes, str, str]:
     response = requests.get(url)
     response.raise_for_status()
+    
     content_type = response.headers.get("Content-Type", "").lower()
-    return response.content, content_type
+    content_disposition = response.headers.get("Content-Disposition", "")
+    
+    # Default: last part of the URL
+    filename = url.split("/")[-1]
+    
+    # If Content-Disposition has filename, use it
+    if "filename" in content_disposition.lower():
+        match = re.search(r'filename\*?=(?:UTF-8\'\')?"?([^\";]+)"?', content_disposition)
+        if match:
+            filename = match.group(1)
+    
+    return response.content, content_type, filename
 
-def parse_document(url: str) -> str:
-    file_bytes, content_type = download_file(url)
+
+def parse_document(url: str):
+    file_bytes, content_type , name= download_file(url)
 
     if "pdf" in content_type:
-        return parse_pdf(file_bytes)
+        return name, parse_pdf(file_bytes)
     elif "wordprocessingml" in content_type or "docx" in content_type:
-        return parse_docx(file_bytes)
+        return name, parse_docx(file_bytes)
     elif "message/rfc822" in content_type or "eml" in content_type:
-        return parse_eml(file_bytes)
+        return name, parse_eml(file_bytes)
     else:
         raise ValueError(f"Unsupported file type: {content_type}")
 
