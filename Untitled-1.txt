@@ -1,6 +1,6 @@
 curl -X POST "https://byte-builders-de.onrender.com/hackrx/run" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer test123" \
+-H "Authorization: Bearer c8ec8a425c4ef55d25ac5b876e2364e2b36b028c41343342ec08872bbcbf015b" \
 -d '{
     "documents": "https://hackrx.blob.core.windows.net/assets/policy.pdf",
     "questions": [
