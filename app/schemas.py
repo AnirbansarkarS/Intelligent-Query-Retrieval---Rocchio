@@ -6,7 +6,4 @@ class QueryRequest(BaseModel):
     questions: List[str]
 
 class QueryResponse(BaseModel):
-    output: str
-    success: bool
-    message: str
-    data: Dict[str, Any] 
+    answers: List[str] 

@@ -17,5 +17,4 @@ def transform_answers(input_list: list) -> dict:
             answers_list.append(answer_field.get("answer", "").strip())
 
     output = {"answers": answers_list}
-    print(f"✅ Extracted {len(answers_list)} answers.")
     return output

@@ -1,0 +1,10 @@
+curl -X POST "https://byte-builders-de.onrender.com/hackrx/run" \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer test123" \
+-d '{
+    "documents": "https://hackrx.blob.core.windows.net/assets/policy.pdf",
+    "questions": [
+        "What is the grace period?",
+        "What is the waiting period for PED?"
+    ]
+}'
