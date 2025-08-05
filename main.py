@@ -1,22 +1,27 @@
-from fastapi import FastAPI
-from app.api import router
+from fastapi import FastAPI, Header, HTTPException
+from typing import List, Optional
+from app.schemas import QueryRequest
 
 app = FastAPI()
 
-@app.get("/")
-def read_root():
-	return {"message": "Hello from FastAPI!"}
+@app.post("/hackrx/run")
+async def run_hackrx(
+    data:QueryRequest ,
+    authorization: Optional[str] = Header(None)
+):
+    # # Check for Bearer token
+    # if not authorization or not authorization.startswith("Bearer "):
+    #     raise HTTPException(status_code=401, detail="Invalid or missing token")
+    
+    # token = authorization.split(" ")[1]
 
-app.include_router(router)
-
-# @app.post("/api/v1/hackrx/run")
-# def run_submission(request: QueryRequest, _: bool = Depends(verify_token)):
-#     pdf_url = request.documents
-#     questions = request.questions
-
-#     # Print inputs for debug
-#     print("PDF URL:", pdf_url)
-#     print("Questions:", questions)
-
-
-
+    # Your logic for processing documents and questions
+    # Example response:
+    return {
+        "status": "success",
+        "received": {
+            # "token": token,
+            "documents": data.documents,
+            "questions": data.questions
+        }
+    }
