@@ -6,10 +6,7 @@ load_dotenv()
 
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 
-def verify_token(x_token: str = Header(...)):
-    if x_token != ACCESS_TOKEN:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing token",
-        )
+def verify_api_key(token):
+    if token != ACCESS_TOKEN:
+        raise HTTPException(status_code=403, detail="Invalid API key")
     return True
