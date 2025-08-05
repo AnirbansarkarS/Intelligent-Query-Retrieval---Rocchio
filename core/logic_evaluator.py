@@ -22,6 +22,7 @@ def evaluate_logic(document: str, questions: List[str]):
         )
         
         output = transform_answers(pipeline_results)
+        logging.info(f"{output}")
         return output
         # print(pipeline_results)
 
