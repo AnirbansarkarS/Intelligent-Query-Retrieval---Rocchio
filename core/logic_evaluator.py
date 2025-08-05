@@ -15,7 +15,7 @@ def evaluate_logic(document: str, questions: List[str]):
         raise ValueError("Document parsing failed: context is empty.")
     try:
         pipeline_results = run_pipeline(
-            doc_id=ids,
+            doc_id=id,
             text=context,
             questions=questions,
             meta={"source": "policy.pdf"}
