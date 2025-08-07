@@ -5,7 +5,7 @@
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg?style=flat-square)
 ![FastAPI](https://img.shields.io/badge/FastAPI-API-green?style=flat-square)
 ![Gemini](https://img.shields.io/badge/LLM-Gemini-blueviolet?style=flat-square)
-![Pinecone](https://img.shields.io/badge/VectorDB-Pinecone-teal?style=flat-square)
+![Pinecone](https://img.shields.io/badge/FAISS-v1.11.0-blue?style=flat-square&logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
 ---
@@ -49,7 +49,7 @@ Designed to work in domains such as:
 | Component | Tech |
 |----------|------|
 | Backend API | [FastAPI](https://fastapi.tiangolo.com/) |
-| Embeddings | Pinecone |
+| Embeddings | FAISS-CPU |
 | File Parsers | pdfplumber, python-docx, email.parser |
 | LLM Provider | Gemini - 2.5 |
 
