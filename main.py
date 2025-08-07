@@ -11,9 +11,14 @@ import logging
 
 app = FastAPI()
 
-@app.post("/")
+@app.get("/")
 async def root():
     return {"massage" : "connected succesdsfully"}
+    
+async def remove_ngrok_warning(request, call_next):
+    response = await call_next(request)
+    response.headers["ngrok-skip-browser-warning"] = "true"
+    return response
 
 @app.post("/hackrx/run")
 async def run_hackrx(

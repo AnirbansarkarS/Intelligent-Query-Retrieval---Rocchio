@@ -1,12 +1,9 @@
 
 import os
 import google.generativeai as genai
-from dotenv import load_dotenv
 
-load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_KEY"))
 
-model = genai.GenerativeModel("gemini-2.5-flash")  
+
 
 SYSTEM_INSTRUCTION = """
 You are an expert assistant for insurance/legal policy questions.
@@ -35,7 +32,11 @@ The output must be strictly valid JSON with no extra formatting. Your response w
 
 
 # edited qury to better suite the api requiremnet
-def query_gemini_flash(question: str, context: str) -> str:
+def query_gemini_flash(question: str, context: str, key :str) -> str:
+    genai.configure(api_key=key)
+
+    model = genai.GenerativeModel("gemini-2.5-flash")  
+
     try:
         prompt = f"{SYSTEM_INSTRUCTION}\n\nContext:\n{context}\n\nQuestion:\n{question}"
         response = model.generate_content(prompt)

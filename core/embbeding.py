@@ -1,13 +1,17 @@
-#Intelligent Query & Retrieval (Optimized Chunk-Based) by XpolioN
+# Intelligent Query & Retrieval (Optimized Chunk-Based) by XpolioN
 # Features: Chunked Ingestion, Batch Query Expansion, Multi-Query Semantic Search, LLM Answer Generation
 
 import os
 import time
 import logging
+import pickle
+import numpy as np
+import faiss
 from dotenv import load_dotenv
-from pinecone import Pinecone, ServerlessSpec
+from pathlib import Path
 import google.generativeai as genai
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from itertools import cycle
 
 from core.llm_handeler import query_gemini_flash
 from utils.chunker import tokenize_and_chunk
@@ -18,94 +22,103 @@ from utils.chunker import tokenize_and_chunk
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 
-genai.configure(api_key=os.getenv("GEMINI_KEY"))
 EMBED_MODEL = "models/embedding-001"
 EMBED_DIM = 768
 
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-INDEX_NAME = os.getenv("PINECONE_INDEX", "doc-embeddings")
+# Get API keys function
+GEMINI_KEYS = [k.strip() for k in os.getenv("GEMINI_KEYS", "").split(",") if k.strip()]
+if not GEMINI_KEYS:
+    raise ValueError("No Gemini keys found in .env (use GEMINI_KEYS=key1,key2,key3)")
+key_cycle = cycle(GEMINI_KEYS)
 
-# Init Pinecone
-pc = Pinecone(api_key=PINECONE_API_KEY)
-if INDEX_NAME not in [idx["name"] for idx in pc.list_indexes()]:
-    logging.info(f"Creating Pinecone index: {INDEX_NAME}")
-    pc.create_index(
-        name=INDEX_NAME,
-        dimension=EMBED_DIM,
-        metric="cosine",
-        spec=ServerlessSpec(cloud="aws", region="us-east-1")
-    )
-    logging.info("Waiting for index to be ready...")
-    time.sleep(10)
+# Relative save paths
+BASE_DIR = Path(__file__).resolve().parent
+STORAGE_DIR = BASE_DIR / "storage"
+STORAGE_DIR.mkdir(parents=True, exist_ok=True)
+INDEX_PATH = STORAGE_DIR / "index.faiss"
+META_PATH = STORAGE_DIR / "faiss_store.pkl"
 
-index = pc.Index(INDEX_NAME)
-logging.info(f"Connected to Pinecone index: {INDEX_NAME}")
+# Load or create FAISS index and metadata store
+if INDEX_PATH.exists() and META_PATH.exists():
+    faiss_index = faiss.read_index(str(INDEX_PATH))
+    with open(META_PATH, "rb") as f:
+        faiss_store = pickle.load(f)
+    logging.info("[LOADED] FAISS index and metadata from disk.")
+else:
+    faiss_index = faiss.IndexIDMap(faiss.IndexFlatL2(EMBED_DIM))
+    faiss_store = {}
+    logging.info("[INIT] New FAISS index and metadata store.")
 
+vector_id_counter = max([vid for ns in faiss_store.values() for vid in ns.keys()], default=0) + 1
+
+key = ""
 # ====================
 # EMBEDDING WRAPPER
 # ====================
+def rotate_key():
+    return next(key_cycle)
+
 def get_gemini_embedding(text: str, task_type: str) -> list:
-    for attempt in range(3):
-        try:
-            response = genai.embed_content(model=EMBED_MODEL, content=text, task_type=task_type)
-            embedding = response.get("embedding")
-            if not embedding:
-                raise ValueError("Empty embedding from Gemini.")
-            return embedding
-        except Exception as e:
-            logging.warning(f"Embedding attempt {attempt+1} failed: {e}")
-            time.sleep(1)
-    raise RuntimeError("Failed to get embedding after 3 retries.")
+    for _ in range(len(GEMINI_KEYS)):
+            key = rotate_key()
+            try:
+                genai.configure(api_key=key)
+                resp = genai.embed_content(model=EMBED_MODEL, content=text, task_type="retrieval_document")
+                emb = resp.get("embedding")
+                if emb:
+                    return np.array(emb, dtype="float32")
+            except Exception as e:
+                if "429" in str(e) or "quota" in str(e).lower():
+                    continue
+                raise
+    raise RuntimeError("All Gemini keys exhausted or failed.")
 
 # ====================
 # INGESTION
 # ====================
 def file_exists(doc_id: str) -> bool:
-    ns = doc_id
-    if ns in index.describe_index_stats().get("namespaces", {}):
-        logging.info(f"Document '{doc_id}' already ingested. Skipping.")
-        return True
-    return False
-
-def wait_for_pinecone_commit(namespace: str, expected_count: int, timeout=30, interval=2):
-    start = time.time()
-    while time.time() - start < timeout:
-        stats = index.describe_index_stats()
-        ns_stats = stats.get("namespaces", {}).get(namespace, {})
-        current_count = ns_stats.get("vector_count", 0)
-        if current_count >= expected_count:
-            logging.info(f"[READY] Namespace '{namespace}' has {current_count} vectors.")
-            return True
-        logging.info(f"[WAIT] {current_count}/{expected_count} vectors. Retrying in {interval}s...")
-        time.sleep(interval)
-    logging.warning(f"[TIMEOUT] Namespace '{namespace}' did not reach {expected_count} vectors.")
-    return False
+    return doc_id in faiss_store
 
 def ingest_document(doc_id: str, text: str, metadata: dict = None):
-    ns = doc_id
-    if file_exists(ns):
+    global vector_id_counter
+    if file_exists(doc_id):
+        logging.info(f"Document '{doc_id}' already ingested. Skipping.")
         return
 
     chunks = tokenize_and_chunk(text)
     logging.info(f"Tokenized into {len(chunks)} chunks.")
     vectors = []
+    ids = []
+    store = {}
 
     def embed_chunk(i, chunk):
         emb = get_gemini_embedding(chunk, "retrieval_document")
-        return {
-            "id": f"{doc_id}_{i}",
-            "values": emb,
-            "metadata": {**(metadata or {}), "text": chunk, "chunk_index": i}
-        }
+        return i, emb, chunk
 
     with ThreadPoolExecutor(max_workers=min(16, len(chunks))) as executor:
         futures = [executor.submit(embed_chunk, i, chunk) for i, chunk in enumerate(chunks)]
         for future in as_completed(futures):
-            vectors.append(future.result())
+            i, emb, chunk = future.result()
+            vec_id = vector_id_counter
+            vector_id_counter += 1
+            vectors.append(np.array(emb, dtype='float32'))
+            ids.append(vec_id)
+            store[vec_id] = {
+                "text": chunk,
+                "chunk_index": i,
+                **(metadata or {})
+            }
 
-    index.upsert(vectors=vectors, namespace=ns)
+    faiss_index.add_with_ids(np.vstack(vectors), np.array(ids))
+    faiss_store[doc_id] = store
     logging.info(f"Ingested {len(vectors)} chunks for '{doc_id}'.")
-    wait_for_pinecone_commit(ns, len(vectors), 10, 0.5)
+
+    # Save index and metadata
+    faiss.write_index(faiss_index, str(INDEX_PATH))
+    with open(META_PATH, "wb") as f:
+        pickle.dump(faiss_store, f)
+    logging.info("[SAVED] Index and metadata saved to disk.")
+
 
 # ====================
 # SEARCH + AGGREGATION
@@ -117,30 +130,27 @@ def intersection_score(query, text):
 
 def semantic_search_multi(variants: list, doc_id: str, top_k: int = 24, original_query: str = None):
     all_matches = {}
-    weights = { "original": 1.5, "variant": 1.0 }
+    weights = {"original": 1.5, "variant": 1.0}
+    doc_store = faiss_store.get(doc_id, {})
 
     for variant in variants:
         embedding = get_gemini_embedding(variant, "retrieval_query")
-        results = index.query(vector=embedding, top_k=top_k, include_metadata=True, namespace=doc_id)
-        matches = results.get("matches", [])
-        if not matches: continue
+        D, I = faiss_index.search(np.array([embedding], dtype='float32'), top_k)
+        for score, vec_id in zip(D[0], I[0]):
+            if vec_id == -1 or vec_id not in doc_store:
+                continue
 
-        max_score = max(m["score"] for m in matches) or 1
-
-        for match in matches:
-            chunk_id = match["id"]
-            norm_score = match["score"] / max_score
             weight = weights["original"] if variant.strip() == original_query.strip() else weights["variant"]
-            weighted_score = norm_score * weight
-            text = match["metadata"]["text"]
+            weighted_score = (1.0 / (score + 1e-5)) * weight  # invert distance for scoring
+            text = doc_store[vec_id]["text"]
             intersect = intersection_score(variant, text)
 
-            if chunk_id in all_matches:
-                all_matches[chunk_id]["score"] += weighted_score
-                all_matches[chunk_id]["intersection"] += intersect * 2
+            if vec_id in all_matches:
+                all_matches[vec_id]["score"] += weighted_score
+                all_matches[vec_id]["intersection"] += intersect * 2
             else:
-                all_matches[chunk_id] = {
-                    "id": chunk_id,
+                all_matches[vec_id] = {
+                    "id": vec_id,
                     "score": weighted_score,
                     "intersection": intersect,
                     "text": text
@@ -153,6 +163,7 @@ def semantic_search_multi(variants: list, doc_id: str, top_k: int = 24, original
     )
     return [sorted_matches[:5], sorted_matches[:top_k]]
 
+
 def process_question(idx, q, expansions, doc_id):
     variants = [q] + expansions.get(str(idx), [])
     logging.info(f"[THREAD] Processing: {q}")
@@ -162,12 +173,24 @@ def process_question(idx, q, expansions, doc_id):
         answer = answer_question(q, matches[1])
     return {"question": q, "answer": answer}
 
+
 # ====================
 # FINAL ANSWER
 # ====================
 def answer_question(query: str, matches: list) -> str:
     context_text = "\n".join([m["text"] for m in matches])
-    return query_gemini_flash(query, context_text)
+    for _ in range(len(GEMINI_KEYS)):
+            key = rotate_key()
+            try:
+                return query_gemini_flash(query, context_text, key=key)
+                
+            except Exception as e:
+                if "429" in str(e) or "quota" in str(e).lower():
+                    continue
+                raise
+    raise RuntimeError("All Gemini keys exhausted or failed.")
+
+
 
 # ====================
 # PIPELINE ENTRY
@@ -177,7 +200,7 @@ def run_pipeline(doc_id: str, text: str, questions: list, meta: dict = None):
     Run the complete ingestion and QnA pipeline.
 
     Args:
-        doc_id (str): Unique identifier for the document (used as Pinecone namespace).
+        doc_id (str): Unique identifier for the document (used as namespace).
         text (str): Raw document text content.
         questions (list): List of questions (strings) to ask based on the document.
         meta (dict, optional): Optional metadata to associate with each chunk during ingestion.
@@ -188,14 +211,6 @@ def run_pipeline(doc_id: str, text: str, questions: list, meta: dict = None):
                   "question": <original_question>,
                   "answer": <generated_answer>
               }
-
-    Example:
-        result = run_pipeline(
-            doc_id="doc1",
-            text="This is a sample document containing useful info.",
-            questions=["What is this about?", "Who is it for?"],
-            meta={"source": "internal"}
-        )
     """
     ingest_document(doc_id, text, meta)
     expansions = {str(i): [] for i in range(len(questions))}
