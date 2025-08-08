@@ -128,7 +128,7 @@ def intersection_score(query, text):
     text_terms = set(text.lower().split())
     return len(query_terms & text_terms) / max(len(query_terms), 1)
 
-def semantic_search_multi(variants: list, doc_id: str, top_k: int = 55, original_query: str = None):
+def semantic_search_multi(variants: list, doc_id: str, top_k: int = 30, original_query: str = None):
     all_matches = {}
     weights = {"original": 1.5, "variant": 1.0}
     doc_store = faiss_store.get(doc_id, {})
@@ -136,12 +136,14 @@ def semantic_search_multi(variants: list, doc_id: str, top_k: int = 55, original
     for variant in variants:
         embedding = get_gemini_embedding(variant, "retrieval_query")
         D, I = faiss_index.search(np.array([embedding], dtype='float32'), top_k)
+        min_d, max_d = D[0].min(), D[0].max()
         for score, vec_id in zip(D[0], I[0]):
             if vec_id == -1 or vec_id not in doc_store:
                 continue
-
+            
+            norm_score = 1.0 if max_d==min_d else (max_d - score) / (max_d - min_d + 1e-5)
             weight = weights["original"] if variant.strip() == original_query.strip() else weights["variant"]
-            weighted_score = (1.0 / (score + 1e-5)) * weight  # invert distance for scoring
+            weighted_score = norm_score * weight  # invert distance for scoring
             text = doc_store[vec_id]["text"]
             intersect = intersection_score(variant, text)
 
@@ -173,7 +175,7 @@ def rerank_with_keyword_overlap(matches, query):
 
     return sorted(
         matches,
-        key=lambda x: x["score"] + x["intersection"] + 0.4 * x["keyword_overlap"],
+        key=lambda x: 0.6* x["score"] + 0.3* x["intersection"] + 0.4 * x["keyword_overlap"],
         reverse=True
     )
 
