@@ -128,7 +128,7 @@ def intersection_score(query, text):
     text_terms = set(text.lower().split())
     return len(query_terms & text_terms) / max(len(query_terms), 1)
 
-def semantic_search_multi(variants: list, doc_id: str, top_k: int = 24, original_query: str = None):
+def semantic_search_multi(variants: list, doc_id: str, top_k: int = 55, original_query: str = None):
     all_matches = {}
     weights = {"original": 1.5, "variant": 1.0}
     doc_store = faiss_store.get(doc_id, {})
@@ -173,7 +173,7 @@ def rerank_with_keyword_overlap(matches, query):
 
     return sorted(
         matches,
-        key=lambda x: x["score"] + x["intersection"] + 0.1 * x["keyword_overlap"],
+        key=lambda x: x["score"] + x["intersection"] + 0.4 * x["keyword_overlap"],
         reverse=True
     )
 
@@ -184,9 +184,9 @@ def process_question(idx, q, expansions, doc_id):
     logging.info(f"[THREAD] Processing: {q}")
     matches = semantic_search_multi(variants, doc_id, original_query=q)
     rerank = rerank_with_keyword_overlap(matches=matches,query=q)
-    answer = answer_question(q, rerank[:10])
+    answer = answer_question(q, rerank[:25])
     if "er-404" in answer:
-        answer = answer_question(q, rerank[:15])
+        answer = answer_question(q, rerank)
     return {"question": q, "answer": answer}
 
 
