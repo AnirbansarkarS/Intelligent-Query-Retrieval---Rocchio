@@ -1,7 +1,6 @@
 from typing import List
 from core.parser import parse_document
 from core.embbeding import run_pipeline
-from core.embbeding import file_exists
 from utils.output_answers import transform_answers
 
 import logging

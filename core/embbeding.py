@@ -2,7 +2,7 @@
 # Features: Chunked Ingestion, Batch Query Expansion, Multi-Query Semantic Search, LLM Answer Generation
 
 import os
-import time
+import re
 import logging
 import pickle
 import numpy as np
@@ -35,23 +35,13 @@ key_cycle = cycle(GEMINI_KEYS)
 BASE_DIR = Path(__file__).resolve().parent
 STORAGE_DIR = BASE_DIR / "storage"
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-INDEX_PATH = STORAGE_DIR / "index.faiss"
-META_PATH = STORAGE_DIR / "faiss_store.pkl"
 
-# Load or create FAISS index and metadata store
-if INDEX_PATH.exists() and META_PATH.exists():
-    faiss_index = faiss.read_index(str(INDEX_PATH))
-    with open(META_PATH, "rb") as f:
-        faiss_store = pickle.load(f)
-    logging.info("[LOADED] FAISS index and metadata from disk.")
-else:
-    faiss_index = faiss.IndexIDMap(faiss.IndexFlatL2(EMBED_DIM))
-    faiss_store = {}
-    logging.info("[INIT] New FAISS index and metadata store.")
+def get_paths(doc_id):
+    return (
+        STORAGE_DIR / f"{doc_id}.faiss",
+        STORAGE_DIR / f"{doc_id}.pkl"
+    )
 
-vector_id_counter = max([vid for ns in faiss_store.values() for vid in ns.keys()], default=0) + 1
-
-key = ""
 # ====================
 # EMBEDDING WRAPPER
 # ====================
@@ -60,33 +50,36 @@ def rotate_key():
 
 def get_gemini_embedding(text: str, task_type: str) -> list:
     for _ in range(len(GEMINI_KEYS)):
-            key = rotate_key()
-            try:
-                genai.configure(api_key=key)
-                resp = genai.embed_content(model=EMBED_MODEL, content=text, task_type=task_type)
-                emb = resp.get("embedding")
-                if emb:
-                    return np.array(emb, dtype="float32")
-            except Exception as e:
-                if "429" in str(e) or "quota" in str(e).lower():
-                    continue
-                raise
+        key = rotate_key()
+        try:
+            genai.configure(api_key=key)
+            resp = genai.embed_content(model=EMBED_MODEL, content=text, task_type=task_type)
+            emb = resp.get("embedding")
+            if emb:
+                return np.array(emb, dtype="float32")
+        except Exception as e:
+            if "429" in str(e) or "quota" in str(e).lower():
+                continue
+            raise
     raise RuntimeError("All Gemini keys exhausted or failed.")
 
 # ====================
 # INGESTION
 # ====================
-def file_exists(doc_id: str) -> bool:
-    return doc_id in faiss_store
+def normalize(vec: np.ndarray) -> np.ndarray:
+    norm = np.linalg.norm(vec)
+    return vec / norm if norm != 0 else vec
 
 def ingest_document(doc_id: str, text: str, metadata: dict = None):
-    global vector_id_counter
-    if file_exists(doc_id):
+    index_path, meta_path = get_paths(doc_id)
+
+    if index_path.exists() and meta_path.exists():
         logging.info(f"Document '{doc_id}' already ingested. Skipping.")
         return
 
     chunks = tokenize_and_chunk(text)
     logging.info(f"Tokenized into {len(chunks)} chunks.")
+
     vectors = []
     ids = []
     store = {}
@@ -99,9 +92,8 @@ def ingest_document(doc_id: str, text: str, metadata: dict = None):
         futures = [executor.submit(embed_chunk, i, chunk) for i, chunk in enumerate(chunks)]
         for future in as_completed(futures):
             i, emb, chunk = future.result()
-            vec_id = vector_id_counter
-            vector_id_counter += 1
-            vectors.append(np.array(emb, dtype='float32'))
+            vec_id = i
+            vectors.append(normalize(np.array(emb, dtype="float32")))
             ids.append(vec_id)
             store[vec_id] = {
                 "text": chunk,
@@ -109,16 +101,14 @@ def ingest_document(doc_id: str, text: str, metadata: dict = None):
                 **(metadata or {})
             }
 
-    faiss_index.add_with_ids(np.vstack(vectors), np.array(ids))
-    faiss_store[doc_id] = store
-    logging.info(f"Ingested {len(vectors)} chunks for '{doc_id}'.")
+    index = faiss.IndexIDMap(faiss.IndexFlatIP(EMBED_DIM))
+    index.add_with_ids(np.vstack(vectors), np.array(ids))
 
-    # Save index and metadata
-    faiss.write_index(faiss_index, str(INDEX_PATH))
-    with open(META_PATH, "wb") as f:
-        pickle.dump(faiss_store, f)
-    logging.info("[SAVED] Index and metadata saved to disk.")
+    faiss.write_index(index, str(index_path))
+    with open(meta_path, "wb") as f:
+        pickle.dump(store, f)
 
+    logging.info(f"[SAVED] Ingested '{doc_id}' with {len(vectors)} chunks.")
 
 # ====================
 # SEARCH + AGGREGATION
@@ -128,24 +118,31 @@ def intersection_score(query, text):
     text_terms = set(text.lower().split())
     return len(query_terms & text_terms) / max(len(query_terms), 1)
 
-def semantic_search_multi(variants: list, doc_id: str, top_k: int = 30, original_query: str = None):
+def semantic_search_multi(variants: list, doc_id: str, top_k: int = 40, original_query: str = None):
+    index_path, meta_path = get_paths(doc_id)
+
+    if not index_path.exists() or not meta_path.exists():
+        raise ValueError(f"Document '{doc_id}' not ingested yet.")
+
+    index = faiss.read_index(str(index_path))
+    with open(meta_path, "rb") as f:
+        doc_store = pickle.load(f)
+
     all_matches = {}
     weights = {"original": 1.5, "variant": 1.0}
-    doc_store = faiss_store.get(doc_id, {})
 
     for variant in variants:
-        embedding = get_gemini_embedding(variant, "retrieval_query")
-        D, I = faiss_index.search(np.array([embedding], dtype='float32'), top_k)
-        min_d, max_d = D[0].min(), D[0].max()
+        embedding = normalize(get_gemini_embedding(variant, "retrieval_query"))
+        D, I = index.search(np.array([embedding], dtype="float32"), top_k)
+
         for score, vec_id in zip(D[0], I[0]):
             if vec_id == -1 or vec_id not in doc_store:
                 continue
-            
-            norm_score = 1.0 if max_d==min_d else (max_d - score) / (max_d - min_d + 1e-5)
-            weight = weights["original"] if variant.strip() == original_query.strip() else weights["variant"]
-            weighted_score = norm_score * weight  # invert distance for scoring
+
             text = doc_store[vec_id]["text"]
             intersect = intersection_score(variant, text)
+            weight = weights["original"] if variant.strip() == original_query.strip() else weights["variant"]
+            weighted_score = score * weight
 
             if vec_id in all_matches:
                 all_matches[vec_id]["score"] += weighted_score
@@ -153,44 +150,51 @@ def semantic_search_multi(variants: list, doc_id: str, top_k: int = 30, original
             else:
                 all_matches[vec_id] = {
                     "id": vec_id,
+                    "doc_id": doc_id,
+                    "text": text,
                     "score": weighted_score,
                     "intersection": intersect,
-                    "text": text
                 }
 
-    sorted_matches = sorted(
-        all_matches.values(),
-        key=lambda x: x["score"] + x["intersection"],
-        reverse=True
-    )
-    return sorted_matches[:top_k]
+    # Final scoring
+    matches = list(all_matches.values())
+    for match in matches:
+        match["final_score"] = 0.65 * match["score"] + 0.35 * match["intersection"]
+
+    return sorted(matches, key=lambda x: x["final_score"], reverse=True)[:top_k]
+
 
 def rerank_with_keyword_overlap(matches, query):
-    query_keywords = set(query.lower().split())
+    # Tokenize query with alphanumeric + camelCase/snake_case support
+    query_keywords = set(re.findall(r"\b[\w']+\b", query.lower()))
 
     for match in matches:
-        text_tokens = set(match["text"].lower().split())
+        # Tokenize text more robustly (handles variable names etc.)
+        text_tokens = set(re.findall(r"\b[\w']+\b", match["text"].lower()))
+
+        # Keyword overlap score
         keyword_overlap = len(query_keywords & text_tokens)
         match["keyword_overlap"] = keyword_overlap
 
-    return sorted(
-        matches,
-        key=lambda x: 0.6* x["score"] + 0.3* x["intersection"] + 0.4 * x["keyword_overlap"],
-        reverse=True
-    )
+        # Final score: tune based on observed quality
+        match["final_score"] = (
+            0.6 * match["score"]
+            + 0.3 * match["intersection"]
+            + 0.4 * match["keyword_overlap"]
+        )
 
-
+    return sorted(matches, key=lambda x: x["final_score"], reverse=True)
 
 def process_question(idx, q, expansions, doc_id):
     variants = [q] + expansions.get(str(idx), [])
     logging.info(f"[THREAD] Processing: {q}")
     matches = semantic_search_multi(variants, doc_id, original_query=q)
-    rerank = rerank_with_keyword_overlap(matches=matches,query=q)
+    rerank = rerank_with_keyword_overlap(matches=matches, query=q)
     answer = answer_question(q, rerank[:25])
     if "er-404" in answer:
+        logging.info(f"retrying for {q}")
         answer = answer_question(q, rerank)
     return {"question": q, "answer": answer}
-
 
 # ====================
 # FINAL ANSWER
@@ -198,38 +202,19 @@ def process_question(idx, q, expansions, doc_id):
 def answer_question(query: str, matches: list) -> str:
     context_text = "\n".join([m["text"] for m in matches])
     for _ in range(len(GEMINI_KEYS)):
-            key = rotate_key()
-            try:
-                return query_gemini_flash(query, context_text, key=key)
-                
-            except Exception as e:
-                if "429" in str(e) or "quota" in str(e).lower():
-                    continue
-                raise
+        key = rotate_key()
+        try:
+            return query_gemini_flash(query, context_text, key=key)
+        except Exception as e:
+            if "429" in str(e) or "quota" in str(e).lower():
+                continue
+            raise
     raise RuntimeError("All Gemini keys exhausted or failed.")
-
-
 
 # ====================
 # PIPELINE ENTRY
 # ====================
 def run_pipeline(doc_id: str, text: str, questions: list, meta: dict = None):
-    """
-    Run the complete ingestion and QnA pipeline.
-
-    Args:
-        doc_id (str): Unique identifier for the document (used as namespace).
-        text (str): Raw document text content.
-        questions (list): List of questions (strings) to ask based on the document.
-        meta (dict, optional): Optional metadata to associate with each chunk during ingestion.
-
-    Returns:
-        list: A list of dictionaries where each dict has the structure:
-              {
-                  "question": <original_question>,
-                  "answer": <generated_answer>
-              }
-    """
     ingest_document(doc_id, text, meta)
     expansions = {str(i): [] for i in range(len(questions))}
     results = [None] * len(questions)

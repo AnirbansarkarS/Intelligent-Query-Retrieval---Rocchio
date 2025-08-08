@@ -6,8 +6,22 @@ from email import policy
 from email.parser import BytesParser
 from email.message import EmailMessage
 
-import requests
 import re
+import hashlib
+import os
+
+def sanitize_filename(name: str) -> str:
+    # Remove illegal Windows characters
+    return re.sub(r'[<>:"/\\|?*]', '_', name)
+
+def generate_unique_id(filename: str) -> str:
+    # Separate base and extension
+    base, _ = os.path.splitext(filename)
+    base = sanitize_filename(base)
+    
+    # Create hash from original filename for uniqueness
+    hash_part = hashlib.sha256(filename.encode()).hexdigest()[:8]  # short hash
+    return f"{base}_{hash_part}"
 
 def download_file(url: str) -> tuple[bytes, str, str]:
     response = requests.get(url)
@@ -25,7 +39,11 @@ def download_file(url: str) -> tuple[bytes, str, str]:
         if match:
             filename = match.group(1)
     
-    return response.content, content_type, filename
+    # Generate Windows-safe, unique ID
+    unique_id = generate_unique_id(filename)
+    
+    return response.content, content_type, unique_id
+
 
 
 def parse_document(url: str):
