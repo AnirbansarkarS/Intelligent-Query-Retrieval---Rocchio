@@ -69,8 +69,8 @@ pip install -r requirements.txt
 ```
 ### 3. SET UP API KEYS IN .env
 ```
-GEMINI_KEY = <your gemini key>
-PINECONE_API_KEY = <your pincone key>
+GEMINI_KEYS = <your gemini key>
+ACCESS_TOKEN = <A TOKEN TO ACCESS YOUR API>
 ```
 
 ### 4. Run the server

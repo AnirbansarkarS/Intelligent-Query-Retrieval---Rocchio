@@ -1,0 +1,11 @@
+curl -X POST "localhost:8000/hackrx/run" \
+-H "Content-Type: application/json" \
+-H "Authorization: Bearer <hidden code>" \
+-d '{
+    "documents": "LINK TO DOC",
+    "questions": [
+        "question_1?",
+        ...
+        "question_n?"
+    ]
+}'

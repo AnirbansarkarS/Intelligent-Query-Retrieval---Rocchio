@@ -63,7 +63,7 @@ def get_gemini_embedding(text: str, task_type: str) -> list:
             key = rotate_key()
             try:
                 genai.configure(api_key=key)
-                resp = genai.embed_content(model=EMBED_MODEL, content=text, task_type="retrieval_document")
+                resp = genai.embed_content(model=EMBED_MODEL, content=text, task_type=task_type)
                 emb = resp.get("embedding")
                 if emb:
                     return np.array(emb, dtype="float32")
@@ -161,16 +161,32 @@ def semantic_search_multi(variants: list, doc_id: str, top_k: int = 24, original
         key=lambda x: x["score"] + x["intersection"],
         reverse=True
     )
-    return [sorted_matches[:5], sorted_matches[:top_k]]
+    return sorted_matches[:top_k]
+
+def rerank_with_keyword_overlap(matches, query):
+    query_keywords = set(query.lower().split())
+
+    for match in matches:
+        text_tokens = set(match["text"].lower().split())
+        keyword_overlap = len(query_keywords & text_tokens)
+        match["keyword_overlap"] = keyword_overlap
+
+    return sorted(
+        matches,
+        key=lambda x: x["score"] + x["intersection"] + 0.1 * x["keyword_overlap"],
+        reverse=True
+    )
+
 
 
 def process_question(idx, q, expansions, doc_id):
     variants = [q] + expansions.get(str(idx), [])
     logging.info(f"[THREAD] Processing: {q}")
     matches = semantic_search_multi(variants, doc_id, original_query=q)
-    answer = answer_question(q, matches[0])
+    rerank = rerank_with_keyword_overlap(matches=matches,query=q)
+    answer = answer_question(q, rerank[:10])
     if "er-404" in answer:
-        answer = answer_question(q, matches[1])
+        answer = answer_question(q, rerank[:15])
     return {"question": q, "answer": answer}
 
 
