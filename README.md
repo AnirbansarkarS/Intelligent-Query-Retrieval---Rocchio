@@ -134,4 +134,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-> ⚠️ *Still under active development. MADE FOR HACKATHON ENTRY*
+> ⚠️ *OPEN FOR CONTRIBUTION*
