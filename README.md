@@ -96,7 +96,7 @@ Document-extractor
 │   ├── chunker.py            # Splits documents into chunks for processing and indexing
 │   └── output_answers.py  # Formats and post-processes answers from the LLM
 ├── requirements.txt          # Lists Python dependencies for the project
-├── test.py                   # Contains test cases for core functionalities
+├── useage.txt                # Contains test cases for core functionalities
 ├── main.py                   # Entry point to start the FastAPI server
 ├── .gitignore                # Specifies files and directories to ignore in Git
 ├── README.md                 # Project description, usage instructions, and documentation
