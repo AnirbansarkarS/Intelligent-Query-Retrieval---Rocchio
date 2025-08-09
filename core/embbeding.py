@@ -159,7 +159,7 @@ def semantic_search_multi(variants: list, doc_id: str, top_k: int = 40, original
     # Final scoring
     matches = list(all_matches.values())
     for match in matches:
-        match["final_score"] = 0.65 * match["score"] + 0.35 * match["intersection"]
+        match["final_score"] = match["score"] +  match["intersection"]
 
     return sorted(matches, key=lambda x: x["final_score"], reverse=True)[:top_k]
 
@@ -193,6 +193,8 @@ def process_question(idx, q, expansions, doc_id):
     answer = answer_question(q, rerank[:25])
     if "er-404" in answer:
         logging.info(f"retrying for {q}")
+        matches = semantic_search_multi(variants, doc_id,top_k= 60,original_query=q)
+        rerank = rerank_with_keyword_overlap(matches=matches, query=q)
         answer = answer_question(q, rerank)
     return {"question": q, "answer": answer}
 
