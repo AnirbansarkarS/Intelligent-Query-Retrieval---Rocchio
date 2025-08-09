@@ -1,11 +1,18 @@
 curl -X POST "localhost:8000/hackrx/run" \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer <hidden code>" \
+-H "Authorization: Bearer c8ec8a425c4ef55d25ac5b876e2364e2b36b028c41343342ec08872bbcbf015b" \
 -d '{
-    "documents": "LINK TO DOC",
+    "documents": "https://hackrx.blob.core.windows.net/assets/Arogya%20Sanjeevani%20Policy%20-%20CIN%20-%20U10200WB1906GOI001713%201.pdf?sv=2023-01-03&st=2025-07-21T08%3A29%3A02Z&se=2025-09-22T08%3A29%3A00Z&sr=b&sp=r&sig=nzrz1K9Iurt%2BBXom%2FB%2BMPTFMFP3PRnIvEsipAX10Ig4%3D",
     "questions": [
-        "question_1?",
-        ...
-        "question_n?"
+        "What is the grace period for premium payment under the National Parivar Mediclaim Plus Policy?",
+        "What is the waiting period for pre-existing diseases (PED) to be covered?",
+        "Does this policy cover maternity expenses, and what are the conditions?",
+        "What is the waiting period for cataract surgery?",
+        "Are the medical expenses for an organ donor covered under this policy?",
+        "What is the No Claim Discount (NCD) offered in this policy?",
+        "Is there a benefit for preventive health check-ups?",
+        "How does the policy define a 'Hospital'?",
+        "What is the extent of coverage for AYUSH treatments?",
+        "Are there any sub-limits on room rent and ICU charges for Plan A?"
     ]
 }'
