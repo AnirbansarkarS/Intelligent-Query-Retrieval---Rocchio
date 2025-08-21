@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 
 from app.schemas import QueryRequest
@@ -10,6 +11,13 @@ import time
 import logging
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],      # allow requests from any origin (dev only)
+    allow_credentials=True,
+    allow_methods=["*"],      # allow POST, OPTIONS, GET, etc.
+    allow_headers=["*"],      # allow Authorization header
+)
 
 @app.get("/")
 async def root():
