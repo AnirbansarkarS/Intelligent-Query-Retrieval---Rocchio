@@ -11,8 +11,7 @@
 ---
 ## 🎥 Showcase
 
-<video src="showcase.mp4" controls width="600"></video>
-
+![Demo](showcase.gif)
 ---
 
 ## 🧠 Overview
