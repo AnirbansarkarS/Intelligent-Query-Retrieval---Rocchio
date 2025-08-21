@@ -9,6 +9,11 @@
 ![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
 
 ---
+## 🎥 Showcase
+
+<video src="showcase.mp4" controls width="600"></video>
+
+---
 
 ## 🧠 Overview
 
